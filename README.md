@@ -33,12 +33,12 @@ This project demonstrates a serverless pipeline for face detection using AWS Lam
 
 ```mermaid
 flowchart LR
-  Producer[Image Producer] -->|SQS message| Q[(Amazon SQS Queue)]
-  Q -->|Triggers| L[AWS Lambda (Container Image)]
-  L -->|Inference| M[MTCNN (facenet-pytorch)]
-  L -->|Logs/Metrics| CW[Amazon CloudWatch]
-  L -->|Optional results| Store[(Object Store)]
-  Q -->|After retries| DLQ[(Dead Letter Queue)]
+  Producer[Image Producer] -->|SQS message| Q[SQS Queue]
+  Q -->|triggers| L[Lambda Container]
+  L -->|inference| M[MTCNN]
+  L -->|logs| CW[CloudWatch]
+  L -->|optional results| Store[Object Store]
+  Q -->|after retries| DLQ[Dead Letter Queue]
 ```
 ---
 
