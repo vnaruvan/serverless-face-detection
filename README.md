@@ -1,137 +1,142 @@
-# Serverless Face Detection Pipeline (AWS Lambda + SQS + ECR)
+# Serverless Face Recognition Pipeline (AWS Lambda + SQS + ECR)
 
-This project demonstrates a serverless pipeline for face detection using AWS Lambda, Amazon SQS, and Amazon ECR. It was built to support stateless, high-throughput processing of image events while maintaining low operational overhead.
+Two stage, serverless face recognition pipeline built on AWS Lambda using SQS for message passing and loose coupling. A client (IoT camera) streams video frames to the cloud app. The system detects faces, recognizes identities, and returns classification results back to the client through a response queue.
 
-> Source code is not shared publicly due to course guidelines. This repository documents the architecture and design.
-
----
-
-## Architecture Overview
-
-### Pipeline Flow
-1. **Images are pushed to an SQS queue**
-   - Each message represents an image event to be processed (either image bytes or a reference to an image stored elsewhere).
-
-2. **A containerized Lambda function is triggered**
-   - The face detection function is deployed as a **container image** stored in **ECR**.
-   - Lambda is invoked via SQS integration and processes messages independently (stateless execution).
-
-3. **Face detection is performed using MTCNN**
-   - The Lambda function runs inference using the **MTCNN** model from `facenet-pytorch`.
-
-4. **Results are logged and/or persisted**
-   - Outputs and diagnostics are logged to **CloudWatch**.
-   - Optionally, results can be stored in an object store depending on deployment needs.
-
-5. **Failures are retried and isolated**
-   - Transient failures retry via SQS redelivery.
-   - Repeated failures can be routed to a Dead Letter Queue (DLQ) to isolate poison messages.
+> Code is not public due to course policy. This repository documents architecture, interfaces, and operational behavior.
 
 ---
 
-## Architecture Diagram
+## What the system does
 
+- **Ingress:** Client sends video frames to `face-detection` via **Lambda Function URL** (HTTP POST).
+- **Stage 1 (Detection):** `face-detection` runs **MTCNN** and publishes detected faces to the **SQS Request Queue**.
+- **Stage 2 (Recognition):** `face-recognition` is triggered by the request queue, computes face embeddings using **InceptionResnetV1 (vggface2)**, matches against reference embeddings, and publishes results to the **SQS Response Queue**.
+- **Egress:** Client polls the response queue to retrieve `{ request_id, result }`.
+
+---
+
+## Architecture
+
+### Named resources (per project spec)
+- Lambda functions:
+  - `face-detection`
+  - `face-recognition`
+- SQS queues:
+  - `<ASU ID>-req-queue`
+  - `<ASU ID>-resp-queue`
+
+### Diagram
 ```mermaid
 flowchart LR
-  Client[Client / IoT camera] -->|POST video frames| FD[Lambda face-detection]
-  FD -->|detected faces + request_id| REQ[SQS Request Queue]
-  REQ -->|SQS trigger| FR[Lambda face-recognition]
-  FR -->|names + request_id| RESP[SQS Response Queue]
-  Client <-->|poll results| RESP
+  Client[Client / IoT camera] -->|POST video frame| FD[Lambda: face-detection]
+  FD -->|detected faces + request_id| REQ[SQS: <ASU ID>-req-queue]
+  REQ -->|SQS trigger| FR[Lambda: face-recognition]
+  FR -->|{request_id, result}| RESP[SQS: <ASU ID>-resp-queue]
+  Client <-->|poll| RESP
 
-  ECR[ECR Container Image] --> FD
+  ECR[ECR container image] --> FD
   ECR --> FR
   FD --> CW[CloudWatch Logs]
   FR --> CW
 ```
 ---
 
-## Technologies
+## Interface contract
+Client → face-detection (HTTP POST)
+
+The request body contains:
+
+content: base64 encoded image bytes
+
+request_id: unique ID for correlation
+
+filename: input image name
+
+face-detection extracts these fields from the JSON-formatted body in the Lambda event.
+
+face-detection → request queue
+
+face-detection publishes detected faces to <ASU ID>-req-queue to trigger recognition.
+
+face-recognition → response queue
+
+face-recognition publishes a dict to <ASU ID>-resp-queue:
+```json
+{ "request_id": "<id>", "result": "<classification result>" }
+```
+
+---
+### Implementation notes (what matters technically)
+
+Loose coupling via SQS: detection and recognition scale and fail independently.
+
+Correlation and tracing: request_id is preserved end to end for debugging and correctness.
+
+Containerized deployment via ECR: both Lambda functions use container images to package ML dependencies reliably.
+
+---
+### Technologies
+
 Core
 
 Python
 
-Docker (container packaging for AWS Lambda)
+Docker (Lambda container images)
 
 AWS Services
 
-AWS Lambda (serverless compute)
+AWS Lambda (function URL ingress + SQS triggered execution)
 
-Amazon SQS (buffering, retries, decoupling)
+Amazon SQS (request queue triggers recognition, response queue polled by client)
 
-Amazon ECR (container image registry)
+Amazon ECR (image registry for Lambda deployment)
 
-Amazon CloudWatch (logs and operational visibility)
+Amazon CloudWatch (logs and diagnostics)
 
 Libraries
 
-facenet-pytorch (MTCNN face detector)
+facenet-pytorch (MTCNN face detection)
 
-boto3 (AWS SDK for Python)
+boto3 (AWS SDK)
+
+awslambdaric (Lambda runtime interface client)
+
+Pillow, opencv-python, requests (image handling and utilities)
 
 ---
+### Performance and workload target
 
-## Features
-Stateless, High-Throughput Processing
+Designed to run under an autograder workload of 100 requests.
 
-Each message is processed independently, enabling horizontal scaling under burst traffic.
+Grading expects average end-to-end latency < 3 seconds for full points.
 
-Queue-Based Decoupling
-
-SQS buffers incoming work and decouples producers from processing rate, improving resilience under load.
-
-Retry Handling and Failure Isolation
-
-Failures are retried via SQS redelivery semantics.
-
-Poison messages can be routed to a DLQ after a configured max receive count to prevent repeated failures from blocking progress.
-
-Cold Start Mitigation Options
-
-Provisioned Concurrency can be enabled to reduce cold-start impact for latency-sensitive workloads.
-
-Container packaging via ECR helps manage heavier ML dependencies more reliably than zip deployments.
-
-Observed Performance (Workload-Style)
-
-Sub-2-second average processing time observed under a burst workload (100 concurrent invocations).
-
-Actual latency depends on Lambda memory/CPU allocation, image size, model load behavior, and cold-start rate.
-
+Lambda CPU scales with memory allocation. A common project configuration is 3000 MB memory for both functions.
 ---
 
 ## Operational Notes
-Backpressure and Concurrency
+Region requirement
 
-SQS provides natural backpressure; producers can enqueue quickly while Lambda scales with queue depth.
+Resources are expected to run in us-east-1 for grading.
 
-Concurrency can be capped to protect downstream services and control cost.
+Queue hygiene and cost control
 
-Monitoring and Debugging
+During development, ensure no messages remain in the queues in a way that causes repeated triggering or unnecessary invocations.
 
-CloudWatch logs capture inference time, errors, and per-request diagnostics.
+Before running workload tests, verify both queues are empty and purge if needed.
 
-Useful signals to monitor:
+Monitoring
 
-Lambda duration and error count
+CloudWatch logs are the primary surface for:
 
-Queue depth / backlog
+request tracing by request_id
 
-DLQ depth and redrive events
+inference failures / timeouts
 
-Common Failure Modes Considered
-
-Invalid/corrupted image payloads (route to DLQ after retries)
-
-Transient AWS/service hiccups (handled via retry)
-
-Backlog spikes (queue buffering + concurrency controls)
-
+throughput and latency debugging
 ---
 
 ## Repository Notes
 
 This repository is intended to present the architecture and design of the project only. Source code is not shared online due to course guidelines. If you’d like to review implementation details, please contact me.
-
 
 
