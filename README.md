@@ -1,5 +1,12 @@
 # Serverless Face Recognition Pipeline (AWS Lambda + SQS + ECR)
 
+[![AWS Lambda](https://img.shields.io/badge/AWS-Lambda-FF9900?logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
+[![Amazon SQS](https://img.shields.io/badge/AWS-SQS-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
+[![Amazon ECR](https://img.shields.io/badge/AWS-ECR-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/ecr/)
+[![CloudWatch](https://img.shields.io/badge/AWS-CloudWatch-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/cloudwatch/)
+[![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
 Two stage serverless pipeline for face detection and identity recognition on video frames. A client submits frames to a detection function, detected faces are passed via SQS to a recognition function, and the client retrieves results from a response queue. Packaged as Lambda container images in ECR to handle ML dependencies cleanly.
 
 > Source code is not public. This repository documents architecture, interfaces, and operational behavior.
@@ -145,4 +152,3 @@ throughput and latency debugging
 ## Repository notes
 
 This repository is intended to present the architecture and design of the project only. Source code is not shared online. If you’d like to review implementation details, please contact me.
-```
