@@ -1,4 +1,3 @@
-```md
 # Serverless Face Recognition Pipeline (AWS Lambda + SQS + ECR)
 
 Two stage serverless pipeline for face detection and identity recognition on video frames. A client submits frames to a detection function, detected faces are passed via SQS to a recognition function, and the client retrieves results from a response queue. Packaged as Lambda container images in ECR to handle ML dependencies cleanly.
