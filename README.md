@@ -33,12 +33,16 @@ This project demonstrates a serverless pipeline for face detection using AWS Lam
 
 ```mermaid
 flowchart LR
-  Producer[Image Producer] -->|SQS message| Q[SQS Queue]
-  Q -->|triggers| L[Lambda Container]
-  L -->|inference| M[MTCNN]
-  L -->|logs| CW[CloudWatch]
-  L -->|optional results| Store[Object Store]
-  Q -->|after retries| DLQ[Dead Letter Queue]
+  Client[Client / IoT camera] -->|POST video frames| FD[Lambda face-detection]
+  FD -->|detected faces + request_id| REQ[SQS Request Queue]
+  REQ -->|SQS trigger| FR[Lambda face-recognition]
+  FR -->|names + request_id| RESP[SQS Response Queue]
+  Client <-->|poll results| RESP
+
+  ECR[ECR Container Image] --> FD
+  ECR --> FR
+  FD --> CW[CloudWatch Logs]
+  FR --> CW
 ```
 ---
 
