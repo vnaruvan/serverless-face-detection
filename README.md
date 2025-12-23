@@ -29,9 +29,9 @@ Two stage, serverless face recognition pipeline built on AWS Lambda using SQS fo
 ```mermaid
 flowchart LR
   Client[Client or IoT camera] -->|POST video frame| FD[Lambda face-detection]
-  FD -->|faces plus request_id| REQ[ASU_ID req queue]
+  FD -->|faces plus request_id| REQ[req queue]
   REQ -->|triggers| FR[Lambda face-recognition]
-  FR -->|request_id plus result| RESP[ASU_ID resp queue]
+  FR -->|request_id plus result| RESP[resp queue]
   Client <-->|poll| RESP
 
   ECR[ECR container image] --> FD
