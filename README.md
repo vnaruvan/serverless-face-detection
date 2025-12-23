@@ -28,15 +28,15 @@ Two stage, serverless face recognition pipeline built on AWS Lambda using SQS fo
 ### Diagram
 ```mermaid
 flowchart LR
-  Client[Client / IoT camera] -->|POST video frame| FD[Lambda: face-detection]
-  FD -->|detected faces + request_id| REQ[SQS: <ASU ID>-req-queue]
-  REQ -->|SQS trigger| FR[Lambda: face-recognition]
-  FR -->|{request_id, result}| RESP[SQS: <ASU ID>-resp-queue]
+  Client[Client or IoT camera] -->|POST video frame| FD[Lambda face-detection]
+  FD -->|faces plus request_id| REQ[ASU_ID req queue]
+  REQ -->|triggers| FR[Lambda face-recognition]
+  FR -->|request_id plus result| RESP[ASU_ID resp queue]
   Client <-->|poll| RESP
 
   ECR[ECR container image] --> FD
   ECR --> FR
-  FD --> CW[CloudWatch Logs]
+  FD --> CW[CloudWatch logs]
   FR --> CW
 ```
 ---
@@ -111,6 +111,7 @@ Designed to run under an autograder workload of 100 requests.
 Grading expects average end-to-end latency < 3 seconds for full points.
 
 Lambda CPU scales with memory allocation. A common project configuration is 3000 MB memory for both functions.
+
 ---
 
 ## Operational Notes
@@ -133,6 +134,7 @@ request tracing by request_id
 inference failures / timeouts
 
 throughput and latency debugging
+
 ---
 
 ## Repository Notes
